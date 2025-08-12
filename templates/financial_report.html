@@ -1,0 +1,315 @@
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+{% extends "base.html" %} {% block content %}
+<div class="container mx-auto p-6">
+  <h2 class="text-3xl font-bold text-gray-800 mb-6">Financial Report</h2>
+
+  <!-- Period Selector -->
+  <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <h3 class="text-xl font-semibold text-gray-700 mb-4">Select Period</h3>
+    <form method="POST" class="flex flex-col md:flex-row gap-4 items-end">
+      {{ form.hidden_tag() }}
+      <div class="flex-1">
+        <label for="month" class="饰lock text-sm font-medium text-gray-700"
+          >Month</label
+        >
+        {{ form.month(class="mt-1 block w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+      </div>
+      <div class="flex-1">
+        <label for="year" class="block text-sm font-medium text-gray-700"
+          >Year</label
+        >
+        {{ form.year(class="mt-1 block w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+      </div>
+      <div>
+        <button
+          type="submit"
+          class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+        >
+          Filter
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Summary Card -->
+  <div class="bg-green-100 p-6 rounded-lg shadow-md mb-6">
+    <h3 class="text-xl font-semibold text-gray-700">Summary ({{ period }})</h3>
+    <p class="text-2xl font-bold text-green-600 mt-2">
+      {{ currency_symbol }}{{ expense_chart_values | sum | round(2) }}
+    </p>
+    <p class="text-gray-600">Total Spent in Selected Period</p>
+    <p class="text-2xl font-bold text-blue-600 mt-2">
+      {{ currency_symbol }}{{ income_chart_values | sum | round(2) }}
+    </p>
+    <p class="text-gray-600">Total Income in Selected Period</p>
+  </div>
+
+  <!-- Chart Selector and Pie Charts -->
+  <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+    <h3 class="text-xl font-semibold text-gray-700 mb-4">
+      Breakdown ({{ period }})
+    </h3>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2"
+        >Select Chart</label
+      >
+      <div class="flex gap-4">
+        <label class="flex items-center">
+          <input
+            type="radio"
+            name="chartType"
+            value="expense"
+            checked
+            class="mr-2 focus:ring-green-500"
+          />
+          Expense Breakdown
+        </label>
+        <label class="flex items-center">
+          <input
+            type="radio"
+            name="chartType"
+            value="income"
+            class="mr-2 focus:ring-green-500"
+          />
+          Income Breakdown
+        </label>
+      </div>
+    </div>
+    {% if expense_chart_labels or income_chart_labels %}
+    <div id="expenseChartContainer" class="max-w-md mx-auto">
+      <canvas id="expenseChart"></canvas>
+    </div>
+    <div
+      id="incomeChartContainer"
+      class="max-w-md mx-auto"
+      style="display: none"
+    >
+      <canvas id="incomeChart"></canvas>
+    </div>
+    {% else %}
+    <p class="text-gray-600 italic">No data recorded for {{ period }}.</p>
+    {% endif %}
+  </div>
+
+  <!-- Transactions Table -->
+  <div class="bg-white p-6 rounded-lg shadow-md">
+    <h3 class="text-xl font-semibold text-gray-700 mb-4">
+      Transactions ({{ period }})
+    </h3>
+    {% if expenses or incomes %}
+    <table class="w-full border-collapse">
+      <thead>
+        <tr class="bg-gray-200">
+          <th class="border p-3 text-left text-gray-700">Date</th>
+          <th class="border p-3 text-left text-gray-700">Type</th>
+          <th class="border p-3 text-left text-gray-700">Category</th>
+          <th class="border p-3 text-left text-gray-700">Description</th>
+          <th class="border p-3 text-left text-gray-700">Amount</th>
+          <th class="border p-3 text-left text-gray-700">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for income, converted_amount in incomes %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="border p-3">{{ income.date.strftime('%Y-%m-%d') }}</td>
+          <td class="border p-3">Income</td>
+          <td class="border p-3">{{ income.category }}</td>
+          <td class="border p-3">{{ income.description }}</td>
+          <td class="border p-3 text-green-600">
+            {{ currency_symbol }}{{ converted_amount | round(2) }}
+          </td>
+          <td class="border p-3">
+            <a
+              href="{{ url_for('delete_income', id=income.id) }}"
+              class="text-red-600 hover:underline"
+              >x</a
+            >
+          </td>
+        </tr>
+        {% endfor %} {% for expense, converted_amount in expenses %}
+        <tr class="hover:bg-gray-50 transition">
+          <td class="border p-3">{{ expense.date.strftime('%Y-%m-%d') }}</td>
+          <td class="border p-3">Expense</td>
+          <td class="border p-3">{{ expense.category }}</td>
+          <td class="border p-3">{{ expense.description }}</td>
+          <td class="border p-3 text-red-600">
+            {{ currency_symbol }}{{ converted_amount | round(2) }}
+          </td>
+          <td class="border p-3">
+            <a
+              href="{{ url_for('delete_expense', id=expense.id) }}"
+              class="text-red-600 hover:underline"
+              >x</a
+            >
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-gray-600 italic">
+      No transactions recorded for {{ period }}.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Chart.js Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+<script>
+  {% if expense_chart_labels or income_chart_labels %}
+  const expenseCtx = document.getElementById('expenseChart').getContext('2d');
+  const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+
+  const chartConfig = {
+    type: 'pie',
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            font: {
+              size: 14
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              let label = context.label || '';
+              let value = context.raw || 0;
+              return `${label}: {{ currency_symbol }}${value.toFixed(2)}`;
+            }
+          }
+        }
+      }
+    }
+  };
+
+  const expenseChart = new Chart(expenseCtx, {
+    ...chartConfig,
+    data: {
+      labels: {{ expense_chart_labels | safe }},
+      datasets: [{
+        data: {{ expense_chart_values | safe }},
+        backgroundColor: ['#10B981', '#EF4444', '#3B82F6', '#F59E0B', '#6B7280'],
+        borderColor: '#FFFFFF',
+        borderWidth: 2
+      }]
+    }
+  });
+
+  const incomeChart = new Chart(incomeCtx, {
+    ...chartConfig,
+    data: {
+      labels: {{ income_chart_labels | safe }},
+      datasets: [{
+        data: {{ income_chart_values | safe }},
+        backgroundColor: ['#10B981', '#EF4444', '#3B82F6', '#F59E0B', '#6B7280'],
+        borderColor: '#FFFFFF',
+        borderWidth: 2
+      }]
+    }
+  });
+
+  function updateChartVisibility() {
+    const chartType = document.querySelector('input[name="chartType"]:checked').value;
+    document.getElementById('expenseChartContainer').style.display = chartType === 'expense' ? 'block' : 'none';
+    document.getElementById('incomeChartContainer').style.display = chartType === 'income' ? 'block' : 'none';
+  }
+
+  document.querySelectorAll('input[name="chartType"]').forEach(radio => {
+    radio.addEventListener('change', updateChartVisibility);
+  });
+
+  // Initialize visibility
+  updateChartVisibility();
+  {% endif %}
+</script>
+{% endblock %}

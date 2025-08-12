@@ -1,0 +1,197 @@
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+{% extends "base.html" %} {% block content %}
+<div class="container mx-auto p-6">
+  <div class="bg-white p-6 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">
+      Welcome, {{ current_user.username }}!
+    </h2>
+
+    <!-- Currency Selector -->
+    <div class="mb-6">
+      <form
+        method="POST"
+        action="{{ url_for('update_currency') }}"
+        class="w-full md:w-1/3"
+      >
+        {{ currency_form.hidden_tag() }}
+        <label
+          for="currency"
+          class="block text-sm font-medium text-gray-700 mb-1"
+          >Currency</label
+        >
+        {{ currency_form.currency(class="w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+        <button
+          type="submit"
+          class="mt-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+        >
+          Update
+        </button>
+      </form>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="bg-green-100 p-4 rounded-lg">
+        <h3 class="text-lg font-semibold text-gray-700">
+          Total Income ({{ month }})
+        </h3>
+        <p class="text-2xl font-bold text-green-600">
+          {{ currency_symbol }}{{ total_income | round(2) }}
+        </p>
+      </div>
+      <div class="bg-red-100 p-4 rounded-lg">
+        <h3 class="text-lg font-semibold text-gray-700">
+          Total Spent ({{ month }})
+        </h3>
+        <p class="text-2xl font-bold text-red-600">
+          {{ currency_symbol }}{{ total_spent | round(2) }}
+        </p>
+      </div>
+      <div class="bg-blue-100 p-4 rounded-lg">
+        <h3 class="text-lg font-semibold text-gray-700">
+          Balance ({{ month }})
+        </h3>
+        <p class="text-2xl font-bold text-blue-600">
+          {{ currency_symbol }}{{ balance | round(2) }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Transaction Links -->
+    <div class="mb-6">
+      <h4 class="text-xl font-semibold text-gray-800 mb-4">
+        Add Transaction ({{ month }})
+      </h4>
+      <div class="flex space-x-4">
+        <a
+          href="{{ url_for('add_income') }}"
+          class="bg-green-600 text-white text-2xl font-bold px-4 py-2 rounded-md hover:bg-green-700 transition"
+          >+</a
+        >
+        <a
+          href="{{ url_for('add_expense') }}"
+          class="bg-red-600 text-white text-2xl font-bold px-4 py-2 rounded-md hover:bg-red-700 transition"
+          >−</a
+        >
+      </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div>
+      <h4 class="text-xl font-semibold text-gray-800 mb-4">
+        Transactions ({{ month }})
+      </h4>
+      {% if transactions %}
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="border p-2 text-left">Date</th>
+            <th class="border p-2 text-left">Type</th>
+            <th class="border p-2 text-left">Description</th>
+            <th class="border p-2 text-left">Category</th>
+            <th class="border p-2 text-left">Amount</th>
+            <th class="border p-2 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for transaction, amount, type in transactions %}
+          <tr class="hover:bg-gray-50">
+            <td class="border p-2">
+              {{ transaction.date.strftime('%Y-%m-%d') }}
+            </td>
+            <td class="border p-2">{{ type }}</td>
+            <td class="border p-2">{{ transaction.description }}</td>
+            <td class="border p-2">{{ transaction.category }}</td>
+            <td
+              class="border p-2 {% if type == 'Income' %}text-green-600{% else %}text-red-600{% endif %}"
+            >
+              {{ currency_symbol }}{{ amount | round(2) }}
+            </td>
+            <td class="border p-2">
+              <a
+                href="{{ url_for('delete_' + type.lower(), id=transaction.id) }}"
+                class="text-red-600 hover:text-red-800"
+                title="Delete"
+              >
+                <svg
+                  class="w-5 h-5 inline"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  ></path>
+                </svg>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-gray-600 italic">
+        No transactions recorded for {{ month }}.
+      </p>
+      {% endif %}
+      <div class="mt-4">
+        <a
+          href="{{ url_for('financial_report') }}"
+          class="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700"
+          >View Financial Report</a
+        >
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

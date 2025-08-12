@@ -1,0 +1,97 @@
+<!-- add_income.html -->
+<script type="text/javascript">
+  var gk_isXlsx = false;
+  var gk_xlsxFileLookup = {};
+  var gk_fileData = {};
+  function filledCell(cell) {
+    return cell !== "" && cell != null;
+  }
+  function loadFileData(filename) {
+    if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+      try {
+        var workbook = XLSX.read(gk_fileData[filename], { type: "base64" });
+        var firstSheetName = workbook.SheetNames[0];
+        var worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON to filter blank rows
+        var jsonData = XLSX.utils.sheet_to_json(worksheet, {
+          header: 1,
+          blankrows: false,
+          defval: "",
+        });
+        // Filter out blank rows (rows where all cells are empty, null, or undefined)
+        var filteredData = jsonData.filter((row) => row.some(filledCell));
+
+        // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+        var headerRowIndex = filteredData.findIndex(
+          (row, index) =>
+            row.filter(filledCell).length >=
+            filteredData[index + 1]?.filter(filledCell).length
+        );
+        // Fallback
+        if (headerRowIndex === -1 || headerRowIndex > 25) {
+          headerRowIndex = 0;
+        }
+
+        // Convert filtered JSON back to CSV
+        var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+        csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+        return csv;
+      } catch (e) {
+        console.error(e);
+        return "";
+      }
+    }
+    return gk_fileData[filename] || "";
+  }
+</script>
+{% extends "base.html" %} {% block content %}
+<div class="container mx-auto p-6">
+  <div class="bg-white p-6 rounded-lg shadow-md max-w-md mx-auto">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Add New Income</h2>
+    <form method="POST" action="{{ url_for('add_income') }}">
+      {{ form.hidden_tag() }}
+      <div class="mb-4">
+        <label for="amount" class="block text-sm font-medium text-gray-700"
+          >Amount</label
+        >
+        <div class="mt-1 flex rounded-md shadow-sm">
+          <span
+            class="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500"
+            >{{ currency_symbol }}</span
+          >
+          {{ form.amount(class="flex-1 block w-full rounded-none rounded-r-md
+          border-gray-300 focus:ring-green-500 focus:border-green-500") }}
+        </div>
+      </div>
+      <div class="mb-4">
+        <label for="category" class="block text-sm font-medium text-gray-700"
+          >Category</label
+        >
+        {{ form.category(class="mt-1 block w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+      </div>
+      <div class="mb-4">
+        <label for="description" class="block text-sm font-medium text-gray-700"
+          >Description</label
+        >
+        {{ form.description(class="mt-1 block w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+      </div>
+      <div class="mb-4">
+        <label for="date" class="block text-sm font-medium text-gray-700"
+          >Date</label
+        >
+        {{ form.date(class="mt-1 block w-full border-gray-300 rounded-md
+        shadow-sm focus:ring-green-500 focus:border-green-500") }}
+      </div>
+      <button
+        type="submit"
+        class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+      >
+        Add Income
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
