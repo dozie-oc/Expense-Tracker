@@ -1,4 +1,3 @@
-```markdown
 # 📊 Expense Tracker with User Authentication
 
 A **Flask** web application that lets users securely manage their incomes and expenses, view detailed financial reports, and visualize their spending/saving patterns with interactive charts.
@@ -23,6 +22,8 @@ A **Flask** web application that lets users securely manage their incomes and ex
 
 ## 📂 Project Structure
 
+```
+---
 expense-tracker/
 │
 ├── static/                # Static assets (CSS, JS, images)
@@ -38,7 +39,6 @@ expense-tracker/
 ├── main.py                 # Main Flask application
 ├── requirements.txt        # Python dependencies
 └── README.md               # Project documentation
-
 ---
 ```
 
