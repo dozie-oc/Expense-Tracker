@@ -17,6 +17,9 @@ A **Flask** web application that lets users securely manage their incomes and ex
   - Summary of total income, total expenses, and balance
 - **Responsive UI**
   - TailwindCSS for a clean, mobile-friendly design
+- **Dynamic Currencies**
+  - Ability to switch and convert between currencies
+  - User can document imcome in Euros and expenses in dollars, with accurate conversion between them.
 
 ---
 
