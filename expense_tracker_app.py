@@ -21,15 +21,25 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Load configuration from environment variables for render
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///expenses.db')
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'email@gmail.com'  # Replace with your Gmail address
-app.config['MAIL_PASSWORD'] = 'random'  # Replace with your 16-character app-specific-password
-app.config['EXCHANGE_RATE_API_KEY'] = 'apikey'  # Replace with your exchangerate-api.com API key
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['EXCHANGE_RATE_API_KEY'] = os.getenv('EXCHANGE_RATE_API_KEY', 'fallback-api-key')
+
+# app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
+# app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+# app.config['MAIL_PORT'] = 587
+# app.config['MAIL_USE_TLS'] = True
+# app.config['MAIL_USERNAME'] = 'email@gmail.com'  # Replace with your Gmail address
+# app.config['MAIL_PASSWORD'] = 'random'  # Replace with your 16-character app-specific-password
+# app.config['EXCHANGE_RATE_API_KEY'] = 'apikey'  # Replace with your exchangerate-api.com API key
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 mail = Mail(app)
