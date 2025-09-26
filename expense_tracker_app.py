@@ -30,6 +30,7 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['EXCHANGE_RATE_API_KEY'] = os.getenv('EXCHANGE_RATE_API_KEY', 'fallback-api-key')
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "sqlite:///expenses.db")
 
 # app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
