@@ -30,7 +30,7 @@ app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['EXCHANGE_RATE_API_KEY'] = os.getenv('EXCHANGE_RATE_API_KEY', 'fallback-api-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv("DATABASE_URL", "sqlite:///expenses.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://postgres:dozie@localhost:5432/expense_tracker_db"
 
 # app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
@@ -106,7 +106,7 @@ class PeriodForm(FlaskForm):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(120), nullable=False)
+    password_hash = db.Column(db.Text, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     currency = db.Column(db.String(3), default='USD')
 
@@ -436,16 +436,22 @@ def add_income():
 def financial_report():
     form = PeriodForm()
     now = datetime.utcnow() + timedelta(hours=1)
+
+    # populate year choices based on user's data
     form.year.choices = get_year_choices()
-    form.month.data = str(now.month)
-    form.year.data = str(now.year)
-    
-    month = str(now.month)
-    year = str(now.year)
-    if form.validate_on_submit():
-        month = form.month.data
-        year = form.year.data
-    
+
+    # --- DO NOT overwrite posted values ---
+    # only set defaults when the form does not already have values (i.e., on initial GET)
+    if not form.month.data:
+        form.month.data = str(now.month)
+    if not form.year.data:
+        form.year.data = str(now.year)
+
+    # read selected values (either submitted or defaults)
+    month = form.month.data
+    year = form.year.data
+
+    # convert to ints where needed
     year = int(year)
     if month == 'All':
         start_date = datetime(year, 1, 1)
@@ -454,37 +460,46 @@ def financial_report():
     else:
         month = int(month)
         start_date = datetime(year, month, 1)
+        # safe next-month calc
         end_date = (start_date + timedelta(days=32)).replace(day=1)
         period_display = start_date.strftime('%B %Y')
-    
+
     currency = current_user.currency
     symbol = get_currency_symbol(currency)
-    
+
+    # fetch transactions for the chosen period and currency
     expenses = Expense.query.filter_by(user_id=current_user.id).filter(
-        Expense.date >= start_date, Expense.date < end_date, Expense.currency == currency).order_by(Expense.date.desc()).all()
+        Expense.date >= start_date, Expense.date < end_date, Expense.currency == currency
+    ).order_by(Expense.date.desc()).all()
+
     incomes = Income.query.filter_by(user_id=current_user.id).filter(
-        Income.date >= start_date, Income.date < end_date, Income.currency == currency).order_by(Income.date.desc()).all()
-    
+        Income.date >= start_date, Income.date < end_date, Income.currency == currency
+    ).order_by(Income.date.desc()).all()
+
     converted_expenses = [(e, e.amount) for e in expenses]
     converted_incomes = [(i, i.amount) for i in incomes]
-    
+
     # Expense chart data
-    expense_chart_data = db.session.query(Expense.category, db.func.sum(Expense.amount)).filter_by(
-        user_id=current_user.id).filter(
-        Expense.date >= start_date, Expense.date < end_date, Expense.currency == currency).group_by(Expense.category).all()
+    expense_chart_data = db.session.query(
+        Expense.category, db.func.sum(Expense.amount)
+    ).filter_by(user_id=current_user.id).filter(
+        Expense.date >= start_date, Expense.date < end_date, Expense.currency == currency
+    ).group_by(Expense.category).all()
     expense_chart_labels = [cat[0] for cat in expense_chart_data]
     expense_chart_values = [float(cat[1]) for cat in expense_chart_data]
-    
+
     # Income chart data
-    income_chart_data = db.session.query(Income.category, db.func.sum(Income.amount)).filter_by(
-        user_id=current_user.id).filter(
-        Income.date >= start_date, Income.date < end_date, Income.currency == currency).group_by(Income.category).all()
+    income_chart_data = db.session.query(
+        Income.category, db.func.sum(Income.amount)
+    ).filter_by(user_id=current_user.id).filter(
+        Income.date >= start_date, Income.date < end_date, Income.currency == currency
+    ).group_by(Income.category).all()
     income_chart_labels = [cat[0] for cat in income_chart_data]
     income_chart_values = [float(cat[1]) for cat in income_chart_data]
-    
+
     if not expenses and not incomes:
         flash('No transactions found for the selected period.', 'warning')
-    
+
     return render_template(
         'financial_report.html',
         form=form,
