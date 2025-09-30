@@ -13,3 +13,4 @@ wtforms
 requests
 cachetools
 gunicorn
+psycopg2-binary
