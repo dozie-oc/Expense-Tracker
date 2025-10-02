@@ -15,6 +15,11 @@ import os
 import requests
 from cachetools import TTLCache
 import logging  # Added for debugging
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env
+load_dotenv()
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -36,7 +41,7 @@ if db_url and db_url.startswith("postgres://"):
     # Render gives old scheme sometimes, fix it
     db_url = db_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = db_url or "postgresql://postgres:password@localhost:5432/expense_tracker"
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///expenses.db'
 
 # app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
