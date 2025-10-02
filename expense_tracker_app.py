@@ -23,14 +23,20 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 # Load configuration from environment variables for render
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'fallback-secret-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///expenses.db')
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
 app.config['EXCHANGE_RATE_API_KEY'] = os.getenv('EXCHANGE_RATE_API_KEY', 'fallback-api-key')
-app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql+psycopg2://postgres:dozie@localhost:5432/expense_tracker_db"
+
+# Database config
+db_url = os.getenv('DATABASE_URL')
+if db_url and db_url.startswith("postgres://"):
+    # Render gives old scheme sometimes, fix it
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url or "postgresql://postgres:password@localhost:5432/expense_tracker"
 
 # app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a secure key
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///expenses.db'
