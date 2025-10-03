@@ -48,6 +48,7 @@ expense-tracker/
 ### ⚙️ Installation & Setup
 
 ### 1️⃣ Clone the repository
+
 ```bash
 git clone https://github.com/yourusername/expense-tracker.git
 cd expense-tracker
@@ -112,21 +113,30 @@ http://127.0.0.1:5000
 
 The **Financial Report** page includes:
 
-* A dropdown to toggle between **Income** and **Expense** pie charts instantly (no page reload)
-* Total income, expenses, and balance
-* Delete button for incomes & expenses directly from the dashboard
+- A dropdown to toggle between **Income** and **Expense** pie charts instantly (no page reload)
+- Total income, expenses, and balance
+- Delete button for incomes & expenses directly from the dashboard
 
 ---
 
 ## 📦 Dependencies
 
-* Flask
-* Flask-Login
-* Flask-WTF
-* Flask-SQLAlchemy
-* Werkzeug
-* TailwindCSS
-* Chart.js
+- Flask
+- Flask-Login
+- Flask-WTF
+- Flask-SQLAlchemy
+- Werkzeug
+- email-validator
+- itsdangerous
+- Flask-Migrate
+- python-dotenv
+- flask_mail
+- flask_wtf
+- wtforms
+- requests
+- cachetools
+- gunicorn
+- psycopg2-binary
 
 > Install via:
 
@@ -138,9 +148,8 @@ pip install -r requirements.txt
 
 ## 🔒 Security
 
-* Passwords are hashed before storage.
-* Reset links are time-limited and token-based.
-* CSRF protection enabled via Flask-WTF.
+- Passwords are hashed before storage.
+- Reset links are time-limited and token-based.
+- CSRF protection enabled via Flask-WTF.
 
 ---
-
